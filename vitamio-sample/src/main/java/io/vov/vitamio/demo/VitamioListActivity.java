@@ -22,15 +22,14 @@ import android.view.View;
 import android.widget.ListView;
 import android.widget.SimpleAdapter;
 
-
-import io.vov.vitamio.Vitamio;
+import com.umeng.analytics.MobclickAgent;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import com.umeng.analytics.MobclickAgent;
+import io.vov.vitamio.Vitamio;
 
 /**
  * List
