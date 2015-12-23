@@ -24,7 +24,6 @@ import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
-
 import io.vov.vitamio.MediaPlayer;
 import io.vov.vitamio.MediaPlayer.OnBufferingUpdateListener;
 import io.vov.vitamio.MediaPlayer.OnInfoListener;
@@ -40,6 +39,7 @@ public class VideoViewBuffer extends Activity implements OnInfoListener, OnBuffe
      */
     private String path = "http://pga-video.kssws.ks-cdn.com/xvZHBoeTpGXwdLWhczMYteToUxl9_D96/DOcJ-FxaFrRg4gtDEwOjEzYzowdTsi35";
     private Uri uri;
+    private MediaController mMediaController;
     private VideoView mVideoView;
     private ProgressBar pb;
     private TextView downloadRateView, loadRateView;
@@ -50,8 +50,16 @@ public class VideoViewBuffer extends Activity implements OnInfoListener, OnBuffe
         Vitamio.isInitialized(getApplicationContext());
 
         setContentView(R.layout.videobuffer);
+        findViewById(R.id.root_view).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (mMediaController.isShowing()){
+                    mMediaController.show();
+                }
+            }
+        });
         mVideoView = (VideoView) findViewById(R.id.buffer);
-        pb = (ProgressBar) findViewById(R.id.probar);
+        pb = (ProgressBar) findViewById(R.id.video_buffering_progressbar);
 
         downloadRateView = (TextView) findViewById(R.id.download_rate);
         loadRateView = (TextView) findViewById(R.id.load_rate);
@@ -67,10 +75,20 @@ public class VideoViewBuffer extends Activity implements OnInfoListener, OnBuffe
        * Alternatively,for streaming media you can use
        * mVideoView.setVideoURI(Uri.parse(URLstring));
        */
+            mMediaController = new MediaController(this);
+            mMediaController.setOnBackClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    finish();
+                }
+            });
+            mMediaController.setFileName("这是一个视频");
+
             uri = Uri.parse(path);
             mVideoView.setVideoURI(uri);
-            mVideoView.setMediaController(new MediaController(this));
+            mVideoView.setMediaController(mMediaController);
             mVideoView.requestFocus();
+//            mVideoView.setBufferSize(1 * 1024 * 1024);
             mVideoView.setOnInfoListener(this);
             mVideoView.setOnBufferingUpdateListener(this);
             mVideoView.setOnPreparedListener(new MediaPlayer.OnPreparedListener() {
@@ -88,20 +106,20 @@ public class VideoViewBuffer extends Activity implements OnInfoListener, OnBuffe
     public boolean onInfo(MediaPlayer mp, int what, int extra) {
         switch (what) {
             case MediaPlayer.MEDIA_INFO_BUFFERING_START:
-                if (mVideoView.isPlaying()) {
-                    mVideoView.pause();
+//                if (mVideoView.isPlaying()) {
+//                    mVideoView.pause();
                     pb.setVisibility(View.VISIBLE);
-                    downloadRateView.setText("");
-                    loadRateView.setText("");
-                    downloadRateView.setVisibility(View.VISIBLE);
-                    loadRateView.setVisibility(View.VISIBLE);
-                }
+//                    downloadRateView.setText("");
+//                    loadRateView.setText("");
+//                    downloadRateView.setVisibility(View.VISIBLE);
+//                    loadRateView.setVisibility(View.VISIBLE);
+//                }
                 break;
             case MediaPlayer.MEDIA_INFO_BUFFERING_END:
-                mVideoView.start();
+//                mVideoView.start();
                 pb.setVisibility(View.GONE);
-                downloadRateView.setVisibility(View.GONE);
-                loadRateView.setVisibility(View.GONE);
+//                downloadRateView.setVisibility(View.GONE);
+//                loadRateView.setVisibility(View.GONE);
                 break;
             case MediaPlayer.MEDIA_INFO_DOWNLOAD_RATE_CHANGED:
                 downloadRateView.setText("" + extra + "kb/s" + "  ");
@@ -113,6 +131,27 @@ public class VideoViewBuffer extends Activity implements OnInfoListener, OnBuffe
     @Override
     public void onBufferingUpdate(MediaPlayer mp, int percent) {
         loadRateView.setText(percent + "%");
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        if (mVideoView != null)
+            mVideoView.pause();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (mVideoView != null)
+            mVideoView.resume();
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (mVideoView != null)
+            mVideoView.stopPlayback();
     }
 
 }

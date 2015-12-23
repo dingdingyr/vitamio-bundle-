@@ -1,8 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <resources>
 
-    
-    <style name="MediaController_SeekBar" parent="android:Widget.SeekBar">
+    <style name="MediaController_VideoSeekBar" parent="android:Widget.SeekBar">
         <item name="android:progressDrawable">@drawable/scrubber_progress_horizontal_holo_dark</item>
         <item name="android:indeterminateDrawable">@drawable/scrubber_progress_horizontal_holo_dark</item>
         <item name="android:minHeight">13dip</item>

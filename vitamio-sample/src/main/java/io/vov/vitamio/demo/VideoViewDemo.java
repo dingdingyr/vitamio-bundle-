@@ -19,70 +19,60 @@ package io.vov.vitamio.demo;
 
 import android.app.Activity;
 import android.os.Bundle;
-import android.text.TextUtils;
-import android.view.View;
 import android.widget.EditText;
 import android.widget.Toast;
 
-
 import io.vov.vitamio.MediaPlayer;
 import io.vov.vitamio.Vitamio;
-import io.vov.vitamio.utils.Log;
 import io.vov.vitamio.widget.MediaController;
 import io.vov.vitamio.widget.VideoView;
 
 public class VideoViewDemo extends Activity {
+    /**
+     * TODO: Set the path variable to a streaming video URL or a local media file
+     * path.
+     */
+    boolean ifUpdate;
 
-	/**
-	 * TODO: Set the path variable to a streaming video URL or a local media file
-	 * path.
-	 */
+    @Override
+    public void onCreate(Bundle icicle) {
+        super.onCreate(icicle);
 
-	boolean ifUpdate;;
-	
+        Vitamio.isInitialized(this);
+        setContentView(R.layout.videoview);
+        playfunction();
+    }
 
-	@Override
-	public void onCreate(Bundle icicle) {
-		super.onCreate(icicle);
 
-		Vitamio.isInitialized(this);
-		
-		setContentView(R.layout.videoview);
+    void playfunction() {
+        String path = "";
+        VideoView mVideoView;
+        EditText mEditText;
+        mEditText = (EditText) findViewById(R.id.url);
+        mVideoView = (VideoView) findViewById(R.id.surface_view);
 
-		playfunction();	
-
-	}
-
-	
-	void playfunction(){
-		 String path = "";
-		 VideoView mVideoView;
-		 EditText mEditText;
-		mEditText = (EditText) findViewById(R.id.url);
-		mVideoView = (VideoView) findViewById(R.id.surface_view);
-
-		path="http://dlqncdn.miaopai.com/stream/MVaux41A4lkuWloBbGUGaQ__.mp4";
-      if (path == "") {
-			// Tell the user to provide a media file URL/path.
-			Toast.makeText(VideoViewDemo.this, "Please edit VideoViewDemo Activity, and set path" + " variable to your media file URL/path", Toast.LENGTH_LONG).show();
-			return;
-		} else {
-			/*
+        path = "http://dlqncdn.miaopai.com/stream/MVaux41A4lkuWloBbGUGaQ__.mp4";
+        if (path == "") {
+            // Tell the user to provide a media file URL/path.
+            Toast.makeText(VideoViewDemo.this, "Please edit VideoViewDemo Activity, and set path" + " variable to your media file URL/path", Toast.LENGTH_LONG).show();
+            return;
+        } else {
+            /*
 			 * Alternatively,for streaming media you can use
 			 * mVideoView.setVideoURI(Uri.parse(URLstring));
 			 */
-			mVideoView.setVideoPath(path);
-			mVideoView.setMediaController(new MediaController(this));
-			mVideoView.requestFocus();
+            mVideoView.setVideoPath(path);
+            mVideoView.setMediaController(new MediaController(this));
+            mVideoView.requestFocus();
 
-			mVideoView.setOnPreparedListener(new MediaPlayer.OnPreparedListener() {
-				@Override
-				public void onPrepared(MediaPlayer mediaPlayer) {
-					// optional need Vitamio 4.0
-					mediaPlayer.setPlaybackSpeed(1.0f);
-				}
-			});
-		}
-	}
-	
+            mVideoView.setOnPreparedListener(new MediaPlayer.OnPreparedListener() {
+                @Override
+                public void onPrepared(MediaPlayer mediaPlayer) {
+                    // optional need Vitamio 4.0
+                    mediaPlayer.setPlaybackSpeed(1.0f);
+                }
+            });
+        }
+    }
+
 }

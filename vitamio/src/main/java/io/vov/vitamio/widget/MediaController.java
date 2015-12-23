@@ -32,6 +32,7 @@ import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
+import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.ImageButton;
 import android.widget.PopupWindow;
@@ -74,430 +75,514 @@ import io.vov.vitamio.utils.StringUtils;
  * created in an xml layout.
  */
 public class MediaController extends FrameLayout {
-  private static final int sDefaultTimeout = 3000;
-  private static final int FADE_OUT = 1;
-  private static final int SHOW_PROGRESS = 2;
-  private MediaPlayerControl mPlayer;
-  private Context mContext;
-  private PopupWindow mWindow;
-  private int mAnimStyle;
-  private View mAnchor;
-  private View mRoot;
-  private SeekBar mProgress;
-  private TextView mEndTime, mCurrentTime;
-  private TextView mFileName;
-  private OutlineTextView mInfoView;
-  private String mTitle;
-  private long mDuration;
-  private boolean mShowing;
-  private boolean mDragging;
-  private boolean mInstantSeeking = false;
-  private boolean mFromXml = false;
-  private ImageButton mPauseButton;
-  private AudioManager mAM;
-  private OnShownListener mShownListener;
-  private OnHiddenListener mHiddenListener;
-  @SuppressLint("HandlerLeak")
-  private Handler mHandler = new Handler() {
+    /**
+     * 播放控制面板默认显示时间，超过该时间应该隐藏
+     */
+    private static final int DEFAULT_TIMEOUT = 3000;
+
+    private static final int MSG_FADE_OUT = 1;
+    private static final int MSG_UPDATE_PROGRESS = 2;
+
+    private Context mContext;
+
+    private MediaPlayerControl mPlayer; // 视频播放器对象
+
+    /**
+     * 视频控制面板视图载体
+     */
+    private PopupWindow mWindow;
+    private int mAnimStyle;
+    private View mAnchor;
+    private View mRoot;
+
+    private OutlineTextView mInfoView;
+    /**
+     * video name
+     */
+    private String mTitle;
+    /**
+     * 视频时长
+     */
+    private long mVideoDuration;
+    /**
+     * true, the controller is showing
+     */
+    private boolean mShowing;
+    /**
+     * true, user is dragging the playProgressSeekBar
+     */
+    private boolean mDragging;
+    private boolean mInstantSeeking = false;
+    /**
+     * mFromXml = true，通过布局文件中创建的对象
+     */
+    private boolean mFromXml = false;
+
+    private ImageButton mPauseButton; //播放/暂停按钮
+    private SeekBar mPlayProgressSeekBar; //播放进度条
+    private TextView mTotalTimeTv;
+    private TextView mCurrentTimeTv;
+    private TextView mVideoNameTv;
+
+    private AudioManager mAM;
+
+    private OnShownListener mShownListener;
+    private OnHiddenListener mHiddenListener;
+    private OnClickListener onBackClickListener;
+
+    @SuppressLint("HandlerLeak")
+    private Handler mHandler = new Handler() {
+        @Override
+        public void handleMessage(Message msg) {
+            long pos;
+            switch (msg.what) {
+                case MSG_FADE_OUT:
+                    hide();
+                    break;
+                case MSG_UPDATE_PROGRESS:
+                    pos = updateVideoPlayProgressRelevantUI();
+                    if (!mDragging && mShowing) {
+                        msg = obtainMessage(MSG_UPDATE_PROGRESS);
+                        sendMessageDelayed(msg, 1000 - (pos % 1000));
+                        updatePausePlayBtn();
+                    }
+                    break;
+            }
+        }
+    };
+
+    public MediaController(Context context, AttributeSet attrs) {
+        super(context, attrs);
+        mRoot = this;
+        mFromXml = true;
+        initController(context);
+    }
+
+    public MediaController(Context context) {
+        super(context);
+        if (!mFromXml && initController(context))
+            initFloatingWindow();
+    }
+
+    private boolean initController(Context context) {
+        mContext = context;
+        mAM = (AudioManager) mContext.getSystemService(Context.AUDIO_SERVICE);
+        return true;
+    }
+
     @Override
-    public void handleMessage(Message msg) {
-      long pos;
-      switch (msg.what) {
-        case FADE_OUT:
-          hide();
-          break;
-        case SHOW_PROGRESS:
-          pos = setProgress();
-          if (!mDragging && mShowing) {
-            msg = obtainMessage(SHOW_PROGRESS);
-            sendMessageDelayed(msg, 1000 - (pos % 1000));
-            updatePausePlay();
-          }
-          break;
-      }
-    }
-  };
-  private View.OnClickListener mPauseListener = new View.OnClickListener() {
-    public void onClick(View v) {
-      doPauseResume();
-      show(sDefaultTimeout);
-    }
-  };
-  private OnSeekBarChangeListener mSeekListener = new OnSeekBarChangeListener() {
-    public void onStartTrackingTouch(SeekBar bar) {
-      mDragging = true;
-      show(3600000);
-      mHandler.removeMessages(SHOW_PROGRESS);
-      if (mInstantSeeking)
-        mAM.setStreamMute(AudioManager.STREAM_MUSIC, true);
-      if (mInfoView != null) {
-        mInfoView.setText("");
-        mInfoView.setVisibility(View.VISIBLE);
-      }
+    public void onFinishInflate() {
+        if (mRoot != null)
+            initControllerView(mRoot);
+
+        super.onFinishInflate();
     }
 
-    public void onProgressChanged(SeekBar bar, int progress, boolean fromuser) {
-      if (!fromuser)
-        return;
-
-      long newposition = (mDuration * progress) / 1000;
-      String time = StringUtils.generateTime(newposition);
-      if (mInstantSeeking)
-        mPlayer.seekTo(newposition);
-      if (mInfoView != null)
-        mInfoView.setText(time);
-      if (mCurrentTime != null)
-        mCurrentTime.setText(time);
+    private void initFloatingWindow() {
+        mWindow = new PopupWindow(mContext);
+        mWindow.setFocusable(false);
+        mWindow.setBackgroundDrawable(null);
+        mWindow.setOutsideTouchable(true);
+        mAnimStyle = android.R.style.Animation;
     }
 
-    public void onStopTrackingTouch(SeekBar bar) {
-      if (!mInstantSeeking)
-        mPlayer.seekTo((mDuration * bar.getProgress()) / 1000);
-      if (mInfoView != null) {
-        mInfoView.setText("");
-        mInfoView.setVisibility(View.GONE);
-      }
-      show(sDefaultTimeout);
-      mHandler.removeMessages(SHOW_PROGRESS);
-      mAM.setStreamMute(AudioManager.STREAM_MUSIC, false);
-      mDragging = false;
-      mHandler.sendEmptyMessageDelayed(SHOW_PROGRESS, 1000);
-    }
-  };
-
-  public MediaController(Context context, AttributeSet attrs) {
-    super(context, attrs);
-    mRoot = this;
-    mFromXml = true;
-    initController(context);
-  }
-
-  public MediaController(Context context) {
-    super(context);
-    if (!mFromXml && initController(context))
-      initFloatingWindow();
-  }
-
-  private boolean initController(Context context) {
-    mContext = context;
-    mAM = (AudioManager) mContext.getSystemService(Context.AUDIO_SERVICE);
-    return true;
-  }
-
-  @Override
-  public void onFinishInflate() {
-    if (mRoot != null)
-      initControllerView(mRoot);
-  }
-
-  private void initFloatingWindow() {
-    mWindow = new PopupWindow(mContext);
-    mWindow.setFocusable(false);
-    mWindow.setBackgroundDrawable(null);
-    mWindow.setOutsideTouchable(true);
-    mAnimStyle = android.R.style.Animation;
-  }
-  
-  @TargetApi(Build.VERSION_CODES.JELLY_BEAN)
-	public void setWindowLayoutType() {
-		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.ICE_CREAM_SANDWICH) {
-			try {
-				mAnchor.setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION);
-				Method setWindowLayoutType = PopupWindow.class.getMethod("setWindowLayoutType", new Class[] { int.class });
-				setWindowLayoutType.invoke(mWindow, WindowManager.LayoutParams.TYPE_APPLICATION_ATTACHED_DIALOG);
-			} catch (Exception e) {
-				Log.e("setWindowLayoutType", e);
-			}
-		}
-	}
-
-  /**
-   * Set the view that acts as the anchor for the control view. This can for
-   * example be a VideoView, or your Activity's main view.
-   *
-   * @param view The view to which to anchor the controller when it is visible.
-   */
-  public void setAnchorView(View view) {
-    mAnchor = view;
-    if (!mFromXml) {
-      removeAllViews();
-      mRoot = makeControllerView();
-      mWindow.setContentView(mRoot);
-      mWindow.setWidth(LayoutParams.MATCH_PARENT);
-      mWindow.setHeight(LayoutParams.WRAP_CONTENT);
-    }
-    initControllerView(mRoot);
-  }
-
-  /**
-   * Create the view that holds the widgets that control playback. Derived
-   * classes can override this to create their own.
-   *
-   * @return The controller view.
-   */
-  protected View makeControllerView() {
-    return ((LayoutInflater) mContext.getSystemService(Context.LAYOUT_INFLATER_SERVICE)).inflate(getResources().getIdentifier("mediacontroller", "layout", mContext.getPackageName()), this);
-  }
-
-  private void initControllerView(View v) {
-    mPauseButton = (ImageButton) v.findViewById(getResources().getIdentifier("mediacontroller_play_pause", "id", mContext.getPackageName()));
-    if (mPauseButton != null) {
-      mPauseButton.requestFocus();
-      mPauseButton.setOnClickListener(mPauseListener);
+    @TargetApi(Build.VERSION_CODES.JELLY_BEAN)
+    public void setWindowLayoutType() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.ICE_CREAM_SANDWICH) {
+            try {
+                mAnchor.setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION);
+                Method setWindowLayoutType = PopupWindow.class.getMethod("setWindowLayoutType", new Class[]{int.class});
+                setWindowLayoutType.invoke(mWindow, WindowManager.LayoutParams.TYPE_APPLICATION_ATTACHED_DIALOG);
+            } catch (Exception e) {
+                Log.e("setWindowLayoutType", e);
+            }
+        }
     }
 
-    mProgress = (SeekBar) v.findViewById(getResources().getIdentifier("mediacontroller_seekbar", "id", mContext.getPackageName()));
-    if (mProgress != null) {
-      if (mProgress instanceof SeekBar) {
-        SeekBar seeker = (SeekBar) mProgress;
-        seeker.setOnSeekBarChangeListener(mSeekListener);
-      }
-      mProgress.setMax(1000);
+    /**
+     * Set the view that acts as the anchor for the control view. This can for
+     * example be a VideoView, or your Activity's main view.
+     *
+     * @param view The view to which to anchor the controller when it is visible.
+     * @note VideoView.setMediaController方法执行时，调用该方法，创建视频播放控制页面
+     */
+    public void setAnchorView(View view) {
+        mAnchor = view;
+        if (!mFromXml) {
+            removeAllViews();
+            mRoot = makeControllerView();
+            mWindow.setContentView(mRoot);
+            mWindow.setWidth(LayoutParams.MATCH_PARENT);
+            mWindow.setHeight(LayoutParams.MATCH_PARENT);
+        }
+        initControllerView(mRoot);
     }
 
-    mEndTime = (TextView) v.findViewById(getResources().getIdentifier("mediacontroller_time_total", "id", mContext.getPackageName()));
-    mCurrentTime = (TextView) v.findViewById(getResources().getIdentifier("mediacontroller_time_current", "id", mContext.getPackageName()));
-    mFileName = (TextView) v.findViewById(getResources().getIdentifier("mediacontroller_file_name", "id", mContext.getPackageName()));
-    if (mFileName != null)
-      mFileName.setText(mTitle);
-  }
-
-  public void setMediaPlayer(MediaPlayerControl player) {
-    mPlayer = player;
-    updatePausePlay();
-  }
-
-  /**
-   * Control the action when the seekbar dragged by user
-   *
-   * @param seekWhenDragging True the media will seek periodically
-   */
-  public void setInstantSeeking(boolean seekWhenDragging) {
-    mInstantSeeking = seekWhenDragging;
-  }
-
-  public void show() {
-    show(sDefaultTimeout);
-  }
-
-  /**
-   * Set the content of the file_name TextView
-   *
-   * @param name
-   */
-  public void setFileName(String name) {
-    mTitle = name;
-    if (mFileName != null)
-      mFileName.setText(mTitle);
-  }
-
-  /**
-   * Set the View to hold some information when interact with the
-   * MediaController
-   *
-   * @param v
-   */
-  public void setInfoView(OutlineTextView v) {
-    mInfoView = v;
-  }
-
-  /**
-   * <p>
-   * Change the animation style resource for this controller.
-   * </p>
-   * <p/>
-   * <p>
-   * If the controller is showing, calling this method will take effect only the
-   * next time the controller is shown.
-   * </p>
-   *
-   * @param animationStyle animation style to use when the controller appears
-   *                       and disappears. Set to -1 for the default animation, 0 for no animation, or
-   *                       a resource identifier for an explicit animation.
-   */
-  public void setAnimationStyle(int animationStyle) {
-    mAnimStyle = animationStyle;
-  }
-
-  /**
-   * Show the controller on screen. It will go away automatically after
-   * 'timeout' milliseconds of inactivity.
-   *
-   * @param timeout The timeout in milliseconds. Use 0 to show the controller
-   *                until hide() is called.
-   */
-  public void show(int timeout) {
-    if (!mShowing && mAnchor != null && mAnchor.getWindowToken() != null) {
-      if (mPauseButton != null)
-        mPauseButton.requestFocus();
-
-      if (mFromXml) {
-        setVisibility(View.VISIBLE);
-      } else {
-        int[] location = new int[2];
-
-        mAnchor.getLocationOnScreen(location);
-        Rect anchorRect = new Rect(location[0], location[1], location[0] + mAnchor.getWidth(), location[1] + mAnchor.getHeight());
-
-        mWindow.setAnimationStyle(mAnimStyle);
-        setWindowLayoutType();
-        mWindow.showAtLocation(mAnchor, Gravity.NO_GRAVITY, anchorRect.left, anchorRect.bottom);
-      }
-      mShowing = true;
-      if (mShownListener != null)
-        mShownListener.onShown();
+    /**
+     * Create the view that holds the widgets that control playback. Derived
+     * classes can override this to create their own.
+     *
+     * @return The controller view.
+     */
+    protected View makeControllerView() {
+        return ((LayoutInflater) mContext.getSystemService(Context.LAYOUT_INFLATER_SERVICE)).inflate(getResources().getIdentifier("mediacontroller", "layout", mContext.getPackageName()), this);
     }
-    updatePausePlay();
-    mHandler.sendEmptyMessage(SHOW_PROGRESS);
 
-    if (timeout != 0) {
-      mHandler.removeMessages(FADE_OUT);
-      mHandler.sendMessageDelayed(mHandler.obtainMessage(FADE_OUT), timeout);
+    Button mBackBtn;
+
+    private void initControllerView(View v) {
+        View rootView = v.findViewById(getResources().getIdentifier("mediacontroller_root_view", "id", mContext.getPackageName()));
+        if (rootView != null) {
+            rootView.setOnClickListener(new OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                     hide();
+                }
+            });
+        }
+
+        mBackBtn = (Button) v.findViewById(getResources().getIdentifier("mediacontroller_back_btn", "id", mContext.getPackageName()));
+        if (mBackBtn != null) {
+            mBackBtn.setOnClickListener(onBackClickListener);
+        }
+
+        mPauseButton = (ImageButton) v.findViewById(getResources().getIdentifier("mediacontroller_play_pause", "id", mContext.getPackageName()));
+        if (mPauseButton != null) {
+            mPauseButton.requestFocus();
+            mPauseButton.setOnClickListener(mPlayPauseListener);
+        }
+
+        mPlayProgressSeekBar = (SeekBar) v.findViewById(getResources().getIdentifier("mediacontroller_seekbar", "id", mContext.getPackageName()));
+        if (mPlayProgressSeekBar != null) {
+            mPlayProgressSeekBar.setOnSeekBarChangeListener(mSeekListener);
+            mPlayProgressSeekBar.setMax(1000);
+        }
+
+        mTotalTimeTv = (TextView) v.findViewById(getResources().getIdentifier("mediacontroller_time_total", "id", mContext.getPackageName()));
+        mCurrentTimeTv = (TextView) v.findViewById(getResources().getIdentifier("mediacontroller_time_current", "id", mContext.getPackageName()));
+
+        mVideoNameTv = (TextView) v.findViewById(getResources().getIdentifier("mediacontroller_file_name", "id", mContext.getPackageName()));
+        if (mVideoNameTv != null)
+            mVideoNameTv.setText(mTitle);
     }
-  }
 
-  public boolean isShowing() {
-    return mShowing;
-  }
+    public void setMediaPlayer(MediaPlayerControl player) {
+        mPlayer = player;
+        updatePausePlayBtn();
+    }
 
-  public void hide() {
-    if (mAnchor == null)
-      return;
+    /**
+     * Control the action when the seekbar dragged by user
+     *
+     * @param seekWhenDragging True the media will seek periodically
+     */
+    public void setInstantSeeking(boolean seekWhenDragging) {
+        mInstantSeeking = seekWhenDragging;
+    }
 
-    if (mShowing) {
-      try {
-        mHandler.removeMessages(SHOW_PROGRESS);
-        if (mFromXml)
-          setVisibility(View.GONE);
+
+    /**
+     * Set the content of the file_name TextView
+     *
+     * @param name
+     */
+    public void setFileName(String name) {
+        mTitle = name;
+        if (mVideoNameTv != null)
+            mVideoNameTv.setText(mTitle);
+    }
+
+    /**
+     * Set the View to hold some information when interact with the
+     * MediaController
+     *
+     * @param v
+     */
+    public void setInfoView(OutlineTextView v) {
+        mInfoView = v;
+    }
+
+    /**
+     * <p>
+     * Change the animation style resource for this controller.
+     * </p>
+     * <p/>
+     * <p>
+     * If the controller is showing, calling this method will take effect only the
+     * next time the controller is shown.
+     * </p>
+     *
+     * @param animationStyle animation style to use when the controller appears
+     *                       and disappears. Set to -1 for the default animation, 0 for no animation, or
+     *                       a resource identifier for an explicit animation.
+     */
+    public void setAnimationStyle(int animationStyle) {
+        mAnimStyle = animationStyle;
+    }
+
+
+    public void show() {
+        show(DEFAULT_TIMEOUT);
+    }
+
+    /**
+     * Show the controller on screen.
+     * It will go away automatically after 'timeout' milliseconds of inactivity.
+     *
+     * @param timeout The timeout in milliseconds. Use 0 to show the controller
+     *                until hide() is called.
+     */
+    public void show(int timeout) {
+        if (!mShowing && mAnchor != null && mAnchor.getWindowToken() != null) {
+            if (mPauseButton != null)
+                mPauseButton.requestFocus();
+
+            if (mFromXml) {
+                setVisibility(View.VISIBLE);
+            } else {
+                int[] location = new int[2];
+
+                mAnchor.getLocationOnScreen(location);
+                Rect anchorRect = new Rect(location[0], location[1], location[0] + mAnchor.getWidth(), location[1] + mAnchor.getHeight());
+
+                mWindow.setAnimationStyle(mAnimStyle);
+                setWindowLayoutType();
+                mWindow.showAtLocation(mAnchor, Gravity.NO_GRAVITY, anchorRect.left, anchorRect.bottom);
+            }
+
+            mShowing = true;
+
+            if (mShownListener != null)
+                mShownListener.onShown();
+        }
+        updatePausePlayBtn();
+        mHandler.sendEmptyMessage(MSG_UPDATE_PROGRESS);
+
+        if (timeout != 0) {
+            mHandler.removeMessages(MSG_FADE_OUT);
+            mHandler.sendMessageDelayed(mHandler.obtainMessage(MSG_FADE_OUT), timeout);
+        }
+    }
+
+    public boolean isShowing() {
+        return mShowing;
+    }
+
+    /**
+     * Hide the controller
+     */
+    public void hide() {
+        if (mAnchor == null)
+            return;
+
+        if (mShowing) {
+            try {
+                mHandler.removeMessages(MSG_UPDATE_PROGRESS);
+                if (mFromXml)
+                    setVisibility(View.GONE);
+                else
+                    mWindow.dismiss();
+            } catch (IllegalArgumentException ex) {
+                Log.d("MediaController already removed");
+            }
+
+            mShowing = false;
+
+            if (mHiddenListener != null)
+                mHiddenListener.onHidden();
+        }
+    }
+
+    /**
+     * 根据当前视频播放进度，更新播放进度条进度和当前播放时间等UI
+     *
+     * @return 当前视频播放进度
+     */
+    private long updateVideoPlayProgressRelevantUI() {
+        if (mPlayer == null || mDragging)
+            return 0;
+
+        long position = mPlayer.getCurrentPosition();
+        long duration = mPlayer.getDuration();
+        if (mPlayProgressSeekBar != null) {
+            if (duration > 0) {
+                long pos = 1000L * position / duration;
+                mPlayProgressSeekBar.setProgress((int) pos);
+            }
+            int percent = mPlayer.getBufferPercentage();
+            mPlayProgressSeekBar.setSecondaryProgress(percent * 10);
+        }
+
+        mVideoDuration = duration;
+
+        if (mTotalTimeTv != null)
+            mTotalTimeTv.setText(StringUtils.generateTime(mVideoDuration));
+        if (mCurrentTimeTv != null)
+            mCurrentTimeTv.setText(StringUtils.generateTime(position));
+
+        return position;
+    }
+
+    @Override
+    public boolean onTouchEvent(MotionEvent event) {
+        show(DEFAULT_TIMEOUT);
+        return true;
+    }
+
+    @Override
+    public boolean onTrackballEvent(MotionEvent ev) {
+        show(DEFAULT_TIMEOUT);
+        return false;
+    }
+
+    @Override
+    public boolean dispatchKeyEvent(KeyEvent event) {
+        int keyCode = event.getKeyCode();
+        if (event.getRepeatCount() == 0 && (keyCode == KeyEvent.KEYCODE_HEADSETHOOK || keyCode == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE || keyCode == KeyEvent.KEYCODE_SPACE)) {
+            doPauseResume();
+            show(DEFAULT_TIMEOUT);
+            if (mPauseButton != null)
+                mPauseButton.requestFocus();
+            return true;
+        } else if (keyCode == KeyEvent.KEYCODE_MEDIA_STOP) {
+            if (mPlayer.isPlaying()) {
+                mPlayer.pause();
+                updatePausePlayBtn();
+            }
+            return true;
+        } else if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_MENU) {
+            hide();
+            return true;
+        } else {
+            show(DEFAULT_TIMEOUT);
+        }
+        return super.dispatchKeyEvent(event);
+    }
+
+    @Override
+    public void setEnabled(boolean enabled) {
+        if (mPauseButton != null)
+            mPauseButton.setEnabled(enabled);
+        if (mPlayProgressSeekBar != null)
+            mPlayProgressSeekBar.setEnabled(enabled);
+        super.setEnabled(enabled);
+    }
+
+    public void setOnShownListener(OnShownListener l) {
+        mShownListener = l;
+    }
+
+    public void setOnHiddenListener(OnHiddenListener l) {
+        mHiddenListener = l;
+    }
+
+    public void setOnBackClickListener(OnClickListener listener) {
+        onBackClickListener = listener;
+        if (mBackBtn != null) {
+            mBackBtn.setOnClickListener(onBackClickListener);
+        }
+    }
+
+    /**
+     * 监听播放/暂停点击事件
+     */
+    private View.OnClickListener mPlayPauseListener = new View.OnClickListener() {
+        public void onClick(View v) {
+            doPauseResume();
+            show(DEFAULT_TIMEOUT);
+        }
+    };
+
+    /**
+     * 暂停播放或恢复播放
+     */
+    private void doPauseResume() {
+        if (mPlayer.isPlaying())
+            mPlayer.pause();
         else
-          mWindow.dismiss();
-      } catch (IllegalArgumentException ex) {
-        Log.d("MediaController already removed");
-      }
-      mShowing = false;
-      if (mHiddenListener != null)
-        mHiddenListener.onHidden();
-    }
-  }
+            mPlayer.start();
 
-  public void setOnShownListener(OnShownListener l) {
-    mShownListener = l;
-  }
-
-  public void setOnHiddenListener(OnHiddenListener l) {
-    mHiddenListener = l;
-  }
-
-  private long setProgress() {
-    if (mPlayer == null || mDragging)
-      return 0;
-
-    long position = mPlayer.getCurrentPosition();
-    long duration = mPlayer.getDuration();
-    if (mProgress != null) {
-      if (duration > 0) {
-        long pos = 1000L * position / duration;
-        mProgress.setProgress((int) pos);
-      }
-      int percent = mPlayer.getBufferPercentage();
-      mProgress.setSecondaryProgress(percent * 10);
+        updatePausePlayBtn();
     }
 
-    mDuration = duration;
+    /**
+     * 更新播放按钮UI
+     */
+    private void updatePausePlayBtn() {
+        if (mRoot == null || mPauseButton == null)
+            return;
 
-    if (mEndTime != null)
-      mEndTime.setText(StringUtils.generateTime(mDuration));
-    if (mCurrentTime != null)
-      mCurrentTime.setText(StringUtils.generateTime(position));
-
-    return position;
-  }
-
-  @Override
-  public boolean onTouchEvent(MotionEvent event) {
-    show(sDefaultTimeout);
-    return true;
-  }
-
-  @Override
-  public boolean onTrackballEvent(MotionEvent ev) {
-    show(sDefaultTimeout);
-    return false;
-  }
-
-  @Override
-  public boolean dispatchKeyEvent(KeyEvent event) {
-    int keyCode = event.getKeyCode();
-    if (event.getRepeatCount() == 0 && (keyCode == KeyEvent.KEYCODE_HEADSETHOOK || keyCode == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE || keyCode == KeyEvent.KEYCODE_SPACE)) {
-      doPauseResume();
-      show(sDefaultTimeout);
-      if (mPauseButton != null)
-        mPauseButton.requestFocus();
-      return true;
-    } else if (keyCode == KeyEvent.KEYCODE_MEDIA_STOP) {
-      if (mPlayer.isPlaying()) {
-        mPlayer.pause();
-        updatePausePlay();
-      }
-      return true;
-    } else if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_MENU) {
-      hide();
-      return true;
-    } else {
-      show(sDefaultTimeout);
+        if (mPlayer.isPlaying())
+            mPauseButton.setImageResource(getResources().getIdentifier("mediacontroller_pause", "drawable", mContext.getPackageName()));
+        else
+            mPauseButton.setImageResource(getResources().getIdentifier("mediacontroller_play", "drawable", mContext.getPackageName()));
     }
-    return super.dispatchKeyEvent(event);
-  }
 
-  private void updatePausePlay() {
-    if (mRoot == null || mPauseButton == null)
-      return;
+    private OnSeekBarChangeListener mSeekListener = new OnSeekBarChangeListener() {
+        public void onStartTrackingTouch(SeekBar bar) {
+            mDragging = true;
+            show(3600000);
+            mHandler.removeMessages(MSG_UPDATE_PROGRESS);
+            if (mInstantSeeking)
+                mAM.setStreamMute(AudioManager.STREAM_MUSIC, true);
+            if (mInfoView != null) {
+                mInfoView.setText("");
+                mInfoView.setVisibility(View.VISIBLE);
+            }
+        }
 
-    if (mPlayer.isPlaying())
-      mPauseButton.setImageResource(getResources().getIdentifier("mediacontroller_pause", "drawable", mContext.getPackageName()));
-    else
-      mPauseButton.setImageResource(getResources().getIdentifier("mediacontroller_play", "drawable", mContext.getPackageName()));
-  }
+        public void onProgressChanged(SeekBar bar, int progress, boolean fromuser) {
+            if (!fromuser)
+                return;
 
-  private void doPauseResume() {
-    if (mPlayer.isPlaying())
-      mPlayer.pause();
-    else
-      mPlayer.start();
-    updatePausePlay();
-  }
+            long newPosition = (mVideoDuration * progress) / 1000;
+            String time = StringUtils.generateTime(newPosition);
+            if (mInstantSeeking)
+                mPlayer.seekTo(newPosition);
+            if (mInfoView != null)
+                mInfoView.setText(time);
+            if (mCurrentTimeTv != null)
+                mCurrentTimeTv.setText(time);
+        }
 
-  @Override
-  public void setEnabled(boolean enabled) {
-    if (mPauseButton != null)
-      mPauseButton.setEnabled(enabled);
-    if (mProgress != null)
-      mProgress.setEnabled(enabled);
-    super.setEnabled(enabled);
-  }
+        public void onStopTrackingTouch(SeekBar bar) {
+            if (!mInstantSeeking)
+                mPlayer.seekTo((mVideoDuration * bar.getProgress()) / 1000);
+            if (mInfoView != null) {
+                mInfoView.setText("");
+                mInfoView.setVisibility(View.GONE);
+            }
+            show(DEFAULT_TIMEOUT);
 
-  public interface OnShownListener {
-    public void onShown();
-  }
+            mAM.setStreamMute(AudioManager.STREAM_MUSIC, false);
+            mDragging = false;
 
-  public interface OnHiddenListener {
-    public void onHidden();
-  }
+            mHandler.removeMessages(MSG_UPDATE_PROGRESS);
+            mHandler.sendEmptyMessageDelayed(MSG_UPDATE_PROGRESS, 1000);
+        }
+    };
 
-  public interface MediaPlayerControl {
-    void start();
+    public interface OnShownListener {
+        public void onShown();
+    }
 
-    void pause();
+    public interface OnHiddenListener {
+        public void onHidden();
+    }
 
-    long getDuration();
+    public interface MediaPlayerControl {
+        void start();
 
-    long getCurrentPosition();
+        void pause();
 
-    void seekTo(long pos);
+        long getDuration();
 
-    boolean isPlaying();
+        long getCurrentPosition();
 
-    int getBufferPercentage();
-  }
+        void seekTo(long pos);
 
+        boolean isPlaying();
+
+        int getBufferPercentage();
+    }
 }
