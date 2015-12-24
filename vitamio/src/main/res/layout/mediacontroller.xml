@@ -50,7 +50,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_centerInParent="true"
-        android:background="@drawable/video_player_seek_bar_btn"
+        android:background="@drawable/mediacontroller_button"
         android:src="@drawable/mediacontroller_pause" />
 
     <LinearLayout
