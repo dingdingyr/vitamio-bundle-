@@ -1,57 +1,70 @@
 <?xml version="1.0" encoding="utf-8"?>
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/mediacontroller_root_view"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:id="@+id/mediacontroller_root_view"
     android:background="@color/mediacontroller_bg"
-    android:orientation="vertical">
+    android:orientation="vertical"
+    android:paddingBottom="10dp"
+    android:paddingLeft="15dp"
+    android:paddingRight="15dp"
+    android:paddingTop="10dp">
 
     <Button
         android:id="@+id/mediacontroller_back_btn"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
+        android:layout_width="25dp"
+        android:layout_height="25dp"
         android:layout_alignParentLeft="true"
         android:layout_alignParentTop="true"
-        android:text="返回" />
+        android:background="@drawable/back" />
 
     <TextView
         android:id="@+id/mediacontroller_file_name"
         style="@style/MediaController_Text"
         android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
+        android:layout_height="25dp"
         android:layout_alignTop="@+id/mediacontroller_back_btn"
         android:layout_marginLeft="5dp"
-        android:layout_marginTop="15dp"
         android:layout_toRightOf="@+id/mediacontroller_back_btn"
         android:ellipsize="end"
+        android:gravity="center_vertical"
         android:singleLine="true"
-        android:text="这是标题这是标题" />
+        android:text="这是标题这是标题"
+        android:textColor="#ffffff"
+        android:textSize="16sp" />
 
-    <Button
-        android:id="@+id/mediacontroller_quality_btn"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_alignTop="@+id/mediacontroller_share_btn"
+    <LinearLayout
+        android:layout_width="35dp"
+        android:layout_height="25dp"
         android:layout_marginRight="10dp"
-        android:layout_toLeftOf="@+id/mediacontroller_share_btn"
-        android:text="高清" />
+        android:layout_alignTop="@+id/mediacontroller_share_btn"
+        android:layout_toLeftOf="@+id/mediacontroller_share_btn">
+
+        <Button
+            android:id="@+id/mediacontroller_quality_btn"
+            android:layout_width="35dp"
+            android:layout_height="21dp"
+            android:layout_gravity="center_vertical"
+            android:background="@drawable/definition720" />
+    </LinearLayout>
 
     <Button
         android:id="@+id/mediacontroller_share_btn"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
+        android:layout_width="25dp"
+        android:layout_height="25dp"
         android:layout_alignParentRight="true"
         android:layout_alignParentTop="true"
-        android:text="分享" />
+        android:background="@drawable/share" />
 
 
     <ImageButton
         android:id="@+id/mediacontroller_play_pause"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
+        android:layout_width="30dp"
+        android:layout_height="30dp"
         android:layout_centerInParent="true"
         android:background="@drawable/mediacontroller_button"
-        android:src="@drawable/mediacontroller_pause" />
+        android:src="@drawable/mediacontroller_pause"
+        android:scaleType="centerInside"/>
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -92,27 +105,29 @@
         android:layout_height="wrap_content"
         android:layout_alignParentLeft="true"
         android:layout_centerVertical="true"
+        android:layout_marginLeft="3dp"
         android:orientation="vertical">
 
         <View
-            android:layout_width="30dp"
-            android:layout_height="30dp"
+            android:layout_width="25dp"
+            android:layout_height="25dp"
             android:background="@drawable/mediacontroller_volume_plus" />
 
         <io.vov.vitamio.widget.VerticalSeekBar
             android:id="@+id/mediacontroller_volume_seekbar"
-            style="@style/MediaController_VideoSeekBar"
+            style="@style/MediaController_VolumeSeekBar"
             android:layout_width="wrap_content"
             android:layout_height="150dp"
             android:layout_centerVertical="true"
+            android:layout_gravity="center_horizontal"
             android:layout_toLeftOf="@id/mediacontroller_time_total"
             android:layout_toRightOf="@id/mediacontroller_time_current"
             android:focusable="true"
             android:max="1000" />
 
         <View
-            android:layout_width="30dp"
-            android:layout_height="30dp"
+            android:layout_width="25dp"
+            android:layout_height="25dp"
             android:background="@drawable/mediacontroller_volume_minus" />
     </LinearLayout>
 

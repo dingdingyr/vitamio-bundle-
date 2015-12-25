@@ -12,17 +12,17 @@
 
     <item
         android:id="@android:id/background"
-        android:drawable="@drawable/scrubber_secondary_holo" />
+        android:drawable="@drawable/half_white" />
 
     <item android:id="@android:id/progress">
         <scale
-            android:drawable="@drawable/scrubber_primary_holo"
+            android:drawable="@drawable/white"
             android:scaleWidth="100%" />
     </item>
 
     <item android:id="@android:id/secondaryProgress">
         <scale
-            android:drawable="@drawable/scrubber_secondary_holo"
+            android:drawable="@drawable/more_than_half_white"
             android:scaleWidth="100%" />
     </item>
 

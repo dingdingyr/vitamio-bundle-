@@ -5,4 +5,10 @@
     <color name="mediacontroller_bg_pressed">#ff53c1bd</color>
     <color name="mediacontroller_bg">#99000000</color>
 
+    <drawable name="white">#99ffffff</drawable>
+    <drawable name="half_white">#44ffffff</drawable>
+    <drawable name="more_than_half_white">#66ffffff</drawable>
+
+
+
 </resources>
