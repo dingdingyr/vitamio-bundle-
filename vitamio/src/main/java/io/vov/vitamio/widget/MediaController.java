@@ -257,7 +257,9 @@ public class MediaController extends FrameLayout {
                     if (volumeSeekBar.getProgress() == 1000) {
                         return;
                     }
-                    volumeSeekBar.setProgress((volumeSeekBar.getProgress() + 150) % 1000);
+                    int volume = volumeSeekBar.getProgress() + 150;
+                    volume = volume <= 1000 ? volume : 1000;
+                    volumeSeekBar.setProgress(volume);
                 }
             });
         }
@@ -273,7 +275,10 @@ public class MediaController extends FrameLayout {
                     if (volumeSeekBar.getProgress() == 0) {
                         return;
                     }
-                    volumeSeekBar.setProgress((volumeSeekBar.getProgress() - 150) % 1000);
+
+                    int volume = volumeSeekBar.getProgress() - 150;
+                    volume = volume >= 0 ? volume : 0;
+                    volumeSeekBar.setProgress(volume);
                 }
             });
         }
@@ -564,8 +569,6 @@ public class MediaController extends FrameLayout {
     private VerticalSeekBar.OnSeekBarChangeListener mVolumeSeekListener = new VerticalSeekBar.OnSeekBarChangeListener() {
         @Override
         public void onProgressChanged(VerticalSeekBar VerticalSeekBar, int progress, boolean fromUser) {
-            if (!fromUser)
-                return;
             float volume = (float) progress / 1000;
             mPlayer.setVolume(volume, volume);
         }
