@@ -251,6 +251,9 @@ public class MediaController extends FrameLayout {
             plusVolume.setOnClickListener(new OnClickListener() {
                 @Override
                 public void onClick(View v) {
+                    mHandler.removeMessages(MSG_FADE_OUT);
+                    mHandler.sendMessageDelayed(mHandler.obtainMessage(MSG_FADE_OUT), DEFAULT_TIMEOUT);
+
                     if (volumeSeekBar.getProgress() == 1000) {
                         return;
                     }
@@ -264,6 +267,9 @@ public class MediaController extends FrameLayout {
             minusVolume.setOnClickListener(new OnClickListener() {
                 @Override
                 public void onClick(View v) {
+                    mHandler.removeMessages(MSG_FADE_OUT);
+                    mHandler.sendMessageDelayed(mHandler.obtainMessage(MSG_FADE_OUT), DEFAULT_TIMEOUT);
+
                     if (volumeSeekBar.getProgress() == 0) {
                         return;
                     }
@@ -566,12 +572,13 @@ public class MediaController extends FrameLayout {
 
         @Override
         public void onStartTrackingTouch(VerticalSeekBar VerticalSeekBar) {
-            show(3600000);
+            mHandler.removeMessages(MSG_FADE_OUT);
         }
 
         @Override
         public void onStopTrackingTouch(VerticalSeekBar VerticalSeekBar) {
-            show(DEFAULT_TIMEOUT);
+            mHandler.removeMessages(MSG_FADE_OUT);
+            mHandler.sendMessageDelayed(mHandler.obtainMessage(MSG_FADE_OUT), DEFAULT_TIMEOUT);
         }
     };
 
