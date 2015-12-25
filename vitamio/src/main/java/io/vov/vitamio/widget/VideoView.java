@@ -81,6 +81,38 @@ public class VideoView extends SurfaceView implements MediaController.MediaPlaye
     private static final int STATE_SUSPEND = 6;
     private static final int STATE_RESUME = 7;
     private static final int STATE_SUSPEND_UNSUPPORTED = 8;
+
+    private Uri mUri;
+    private long mDuration;
+    private int mCurrentState = STATE_IDLE;
+    private int mTargetState = STATE_IDLE;
+    private float mAspectRatio = 0;
+    private int mVideoLayout = VIDEO_LAYOUT_SCALE;
+    private SurfaceHolder mSurfaceHolder = null;
+    private MediaPlayer mMediaPlayer = null;
+    private int mVideoWidth;
+    private int mVideoHeight;
+    private float mVideoAspectRatio;
+    private int mVideoChroma = MediaPlayer.VIDEOCHROMA_RGBA;
+    private boolean mHardwareDecoder = false;
+    private int mSurfaceWidth;
+    private int mSurfaceHeight;
+    private MediaController mMediaController;
+    private View mMediaBufferingIndicator;
+    private OnCompletionListener mOnCompletionListener;
+    private OnPreparedListener mOnPreparedListener;
+    private OnErrorListener mOnErrorListener;
+    private OnSeekCompleteListener mOnSeekCompleteListener;
+    private OnTimedTextListener mOnTimedTextListener;
+    private OnInfoListener mOnInfoListener;
+    private OnBufferingUpdateListener mOnBufferingUpdateListener;
+    private int mCurrentBufferPercentage;
+    private long mSeekWhenPrepared; // recording the seek position while preparing
+    private Context mContext;
+    private Map<String, String> mHeaders;
+    private int mBufSize;
+
+
     OnVideoSizeChangedListener mSizeChangedListener = new OnVideoSizeChangedListener() {
         public void onVideoSizeChanged(MediaPlayer mp, int width, int height) {
             Log.d("onVideoSizeChanged: (%dx%d)", width, height);
@@ -169,35 +201,7 @@ public class VideoView extends SurfaceView implements MediaController.MediaPlaye
             release(true);
         }
     };
-    private Uri mUri;
-    private long mDuration;
-    private int mCurrentState = STATE_IDLE;
-    private int mTargetState = STATE_IDLE;
-    private float mAspectRatio = 0;
-    private int mVideoLayout = VIDEO_LAYOUT_SCALE;
-    private SurfaceHolder mSurfaceHolder = null;
-    private MediaPlayer mMediaPlayer = null;
-    private int mVideoWidth;
-    private int mVideoHeight;
-    private float mVideoAspectRatio;
-    private int mVideoChroma = MediaPlayer.VIDEOCHROMA_RGBA;
-    private boolean mHardwareDecoder = false;
-    private int mSurfaceWidth;
-    private int mSurfaceHeight;
-    private MediaController mMediaController;
-    private View mMediaBufferingIndicator;
-    private OnCompletionListener mOnCompletionListener;
-    private OnPreparedListener mOnPreparedListener;
-    private OnErrorListener mOnErrorListener;
-    private OnSeekCompleteListener mOnSeekCompleteListener;
-    private OnTimedTextListener mOnTimedTextListener;
-    private OnInfoListener mOnInfoListener;
-    private OnBufferingUpdateListener mOnBufferingUpdateListener;
-    private int mCurrentBufferPercentage;
-    private long mSeekWhenPrepared; // recording the seek position while preparing
-    private Context mContext;
-    private Map<String, String> mHeaders;
-    private int mBufSize;
+
     private OnCompletionListener mCompletionListener = new OnCompletionListener() {
         public void onCompletion(MediaPlayer mp) {
             Log.d("onCompletion");
@@ -209,6 +213,7 @@ public class VideoView extends SurfaceView implements MediaController.MediaPlaye
                 mOnCompletionListener.onCompletion(mMediaPlayer);
         }
     };
+
     private OnErrorListener mErrorListener = new OnErrorListener() {
         public boolean onError(MediaPlayer mp, int framework_err, int impl_err) {
             Log.d("Error: %d, %d", framework_err, impl_err);

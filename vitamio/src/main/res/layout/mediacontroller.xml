@@ -109,6 +109,7 @@
         android:orientation="vertical">
 
         <View
+            android:id="@+id/mediacontroller_volume_plus"
             android:layout_width="25dp"
             android:layout_height="25dp"
             android:background="@drawable/mediacontroller_volume_plus" />
@@ -126,6 +127,7 @@
             android:max="1000" />
 
         <View
+            android:id="@+id/mediacontroller_volume_minus"
             android:layout_width="25dp"
             android:layout_height="25dp"
             android:background="@drawable/mediacontroller_volume_minus" />

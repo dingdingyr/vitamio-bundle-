@@ -78,7 +78,7 @@ public class MediaController extends FrameLayout {
     /**
      * 播放控制面板默认显示时间，超过该时间应该隐藏
      */
-    private static final int DEFAULT_TIMEOUT = 3000;
+    private static final int DEFAULT_TIMEOUT = 2500;
 
     private static final int MSG_FADE_OUT = 1;
     private static final int MSG_UPDATE_PROGRESS = 2;
@@ -111,7 +111,7 @@ public class MediaController extends FrameLayout {
     /**
      * true, user is dragging the playProgressSeekBar
      */
-    private boolean mDragging;
+    private boolean mPlayProgressSeekBarDragging;
     private boolean mInstantSeeking = false;
 
     private ImageButton mPauseButton; //播放/暂停按钮
@@ -125,6 +125,7 @@ public class MediaController extends FrameLayout {
     private OnShownListener mShownListener;
     private OnHiddenListener mHiddenListener;
     private OnClickListener onBackClickListener;
+    private OnClickListener onShareClickListener;
 
     @SuppressLint("HandlerLeak")
     private Handler mHandler = new Handler() {
@@ -137,7 +138,7 @@ public class MediaController extends FrameLayout {
                     break;
                 case MSG_UPDATE_PROGRESS:
                     pos = updateVideoPlayProgressRelevantUI();
-                    if (!mDragging && mShowing) {
+                    if (!mPlayProgressSeekBarDragging && mShowing) {
                         msg = obtainMessage(MSG_UPDATE_PROGRESS);
                         sendMessageDelayed(msg, 1000 - (pos % 1000));
                         updatePausePlayBtn();
@@ -224,6 +225,8 @@ public class MediaController extends FrameLayout {
     }
 
     Button mBackBtn;
+    Button mShareBtn;
+    VerticalSeekBar volumeSeekBar;
 
     private void initControllerView(View v) {
         View rootView = v.findViewById(getResources().getIdentifier("mediacontroller_root_view", "id", mContext.getPackageName()));
@@ -236,29 +239,42 @@ public class MediaController extends FrameLayout {
             });
         }
 
-        VerticalSeekBar volumeSeekBar = (VerticalSeekBar) v.findViewById(getResources().getIdentifier("mediacontroller_volume_seekbar", "id", mContext.getPackageName()));
+        volumeSeekBar = (VerticalSeekBar) v.findViewById(getResources().getIdentifier("mediacontroller_volume_seekbar", "id", mContext.getPackageName()));
         if (volumeSeekBar != null) {
             volumeSeekBar.setMax(1000);
             volumeSeekBar.setProgress((int) (mVideoVolume * 1000));
-            volumeSeekBar.setOnSeekBarChangeListener(new VerticalSeekBar.OnSeekBarChangeListener() {
+            volumeSeekBar.setOnSeekBarChangeListener(mVolumeSeekListener);
+        }
+
+        View plusVolume = v.findViewById(getResources().getIdentifier("mediacontroller_volume_plus", "id", mContext.getPackageName()));
+        if (plusVolume != null) {
+            plusVolume.setOnClickListener(new OnClickListener() {
                 @Override
-                public void onProgressChanged(VerticalSeekBar VerticalSeekBar, int progress, boolean fromUser) {
-                    if (!fromUser)
+                public void onClick(View v) {
+                    if (volumeSeekBar.getProgress() == 1000) {
                         return;
-                    float volume = (float) progress / 1000;
-                    mPlayer.setVolume(volume, volume);
-                }
-
-                @Override
-                public void onStartTrackingTouch(VerticalSeekBar VerticalSeekBar) {
-
-                }
-
-                @Override
-                public void onStopTrackingTouch(VerticalSeekBar VerticalSeekBar) {
-
+                    }
+                    volumeSeekBar.setProgress((volumeSeekBar.getProgress() + 150) % 1000);
                 }
             });
+        }
+
+        View minusVolume = v.findViewById(getResources().getIdentifier("mediacontroller_volume_minus", "id", mContext.getPackageName()));
+        if (minusVolume != null) {
+            minusVolume.setOnClickListener(new OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    if (volumeSeekBar.getProgress() == 0) {
+                        return;
+                    }
+                    volumeSeekBar.setProgress((volumeSeekBar.getProgress() - 150) % 1000);
+                }
+            });
+        }
+
+        mShareBtn = (Button) v.findViewById(getResources().getIdentifier("mediacontroller_share_btn", "id", mContext.getPackageName()));
+        if (mShareBtn != null) {
+            mShareBtn.setOnClickListener(onShareClickListener);
         }
 
         mBackBtn = (Button) v.findViewById(getResources().getIdentifier("mediacontroller_back_btn", "id", mContext.getPackageName()));
@@ -274,7 +290,7 @@ public class MediaController extends FrameLayout {
 
         mPlayProgressSeekBar = (SeekBar) v.findViewById(getResources().getIdentifier("mediacontroller_seekbar", "id", mContext.getPackageName()));
         if (mPlayProgressSeekBar != null) {
-            mPlayProgressSeekBar.setOnSeekBarChangeListener(mSeekListener);
+            mPlayProgressSeekBar.setOnSeekBarChangeListener(mPlayProgressSeekListener);
             mPlayProgressSeekBar.setMax(1000);
         }
 
@@ -413,7 +429,7 @@ public class MediaController extends FrameLayout {
      * @return 当前视频播放进度
      */
     private long updateVideoPlayProgressRelevantUI() {
-        if (mPlayer == null || mDragging)
+        if (mPlayer == null || mPlayProgressSeekBarDragging)
             return 0;
 
         long position = mPlayer.getCurrentPosition();
@@ -497,6 +513,13 @@ public class MediaController extends FrameLayout {
         }
     }
 
+    public void setOnShareClickListener(OnClickListener listener) {
+        onShareClickListener = listener;
+        if (mShareBtn != null) {
+            mShareBtn.setOnClickListener(onShareClickListener);
+        }
+    }
+
     /**
      * 监听播放/暂停点击事件
      */
@@ -532,9 +555,29 @@ public class MediaController extends FrameLayout {
             mPauseButton.setImageResource(getResources().getIdentifier("mediacontroller_play", "drawable", mContext.getPackageName()));
     }
 
-    private OnSeekBarChangeListener mSeekListener = new OnSeekBarChangeListener() {
+    private VerticalSeekBar.OnSeekBarChangeListener mVolumeSeekListener = new VerticalSeekBar.OnSeekBarChangeListener() {
+        @Override
+        public void onProgressChanged(VerticalSeekBar VerticalSeekBar, int progress, boolean fromUser) {
+            if (!fromUser)
+                return;
+            float volume = (float) progress / 1000;
+            mPlayer.setVolume(volume, volume);
+        }
+
+        @Override
+        public void onStartTrackingTouch(VerticalSeekBar VerticalSeekBar) {
+            show(3600000);
+        }
+
+        @Override
+        public void onStopTrackingTouch(VerticalSeekBar VerticalSeekBar) {
+            show(DEFAULT_TIMEOUT);
+        }
+    };
+
+    private OnSeekBarChangeListener mPlayProgressSeekListener = new OnSeekBarChangeListener() {
         public void onStartTrackingTouch(SeekBar bar) {
-            mDragging = true;
+            mPlayProgressSeekBarDragging = true;
             show(3600000);
             mHandler.removeMessages(MSG_UPDATE_PROGRESS);
             if (mInstantSeeking)
@@ -569,7 +612,7 @@ public class MediaController extends FrameLayout {
             show(DEFAULT_TIMEOUT);
 
             mAM.setStreamMute(AudioManager.STREAM_MUSIC, false);
-            mDragging = false;
+            mPlayProgressSeekBarDragging = false;
 
             mHandler.removeMessages(MSG_UPDATE_PROGRESS);
             mHandler.sendEmptyMessageDelayed(MSG_UPDATE_PROGRESS, 1000);
