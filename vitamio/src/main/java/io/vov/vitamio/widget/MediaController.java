@@ -85,7 +85,7 @@ public class MediaController extends FrameLayout {
 
     private Context mContext;
 
-    private MediaPlayerControl mPlayer; // 视频播放器对象
+    private VideoView mPlayer; // 视频播放器对象
 
     /**
      * 视频控制面板视图载体
@@ -113,10 +113,6 @@ public class MediaController extends FrameLayout {
      */
     private boolean mDragging;
     private boolean mInstantSeeking = false;
-    /**
-     * mFromXml = true，通过布局文件中创建的对象
-     */
-    private boolean mFromXml = false;
 
     private ImageButton mPauseButton; //播放/暂停按钮
     private SeekBar mPlayProgressSeekBar; //播放进度条
@@ -154,13 +150,12 @@ public class MediaController extends FrameLayout {
     public MediaController(Context context, AttributeSet attrs) {
         super(context, attrs);
         mRoot = this;
-        mFromXml = true;
         initController(context);
     }
 
     public MediaController(Context context) {
         super(context);
-        if (!mFromXml && initController(context))
+        if (initController(context))
             initFloatingWindow();
     }
 
@@ -208,13 +203,13 @@ public class MediaController extends FrameLayout {
      */
     public void setAnchorView(View view) {
         mAnchor = view;
-        if (!mFromXml) {
-            removeAllViews();
-            mRoot = makeControllerView();
-            mWindow.setContentView(mRoot);
-            mWindow.setWidth(LayoutParams.MATCH_PARENT);
-            mWindow.setHeight(LayoutParams.MATCH_PARENT);
-        }
+
+        removeAllViews();
+        mRoot = makeControllerView();
+        mWindow.setContentView(mRoot);
+        mWindow.setWidth(LayoutParams.MATCH_PARENT);
+        mWindow.setHeight(LayoutParams.MATCH_PARENT);
+
         initControllerView(mRoot);
     }
 
@@ -236,7 +231,32 @@ public class MediaController extends FrameLayout {
             rootView.setOnClickListener(new OnClickListener() {
                 @Override
                 public void onClick(View v) {
-                     hide();
+                    hide();
+                }
+            });
+        }
+
+        VerticalSeekBar volumeSeekBar = (VerticalSeekBar) v.findViewById(getResources().getIdentifier("mediacontroller_volume_seekbar", "id", mContext.getPackageName()));
+        if (volumeSeekBar != null) {
+            volumeSeekBar.setMax(1000);
+            volumeSeekBar.setProgress((int) (mVideoVolume * 1000));
+            volumeSeekBar.setOnSeekBarChangeListener(new VerticalSeekBar.OnSeekBarChangeListener() {
+                @Override
+                public void onProgressChanged(VerticalSeekBar VerticalSeekBar, int progress, boolean fromUser) {
+                    if (!fromUser)
+                        return;
+                    float volume = (float) progress / 1000;
+                    mPlayer.setVolume(volume, volume);
+                }
+
+                @Override
+                public void onStartTrackingTouch(VerticalSeekBar VerticalSeekBar) {
+
+                }
+
+                @Override
+                public void onStopTrackingTouch(VerticalSeekBar VerticalSeekBar) {
+
                 }
             });
         }
@@ -266,7 +286,7 @@ public class MediaController extends FrameLayout {
             mVideoNameTv.setText(mTitle);
     }
 
-    public void setMediaPlayer(MediaPlayerControl player) {
+    public void setMediaPlayer(VideoView player) {
         mPlayer = player;
         updatePausePlayBtn();
     }
@@ -337,18 +357,14 @@ public class MediaController extends FrameLayout {
             if (mPauseButton != null)
                 mPauseButton.requestFocus();
 
-            if (mFromXml) {
-                setVisibility(View.VISIBLE);
-            } else {
-                int[] location = new int[2];
+            int[] location = new int[2];
 
-                mAnchor.getLocationOnScreen(location);
-                Rect anchorRect = new Rect(location[0], location[1], location[0] + mAnchor.getWidth(), location[1] + mAnchor.getHeight());
+            mAnchor.getLocationOnScreen(location);
+            Rect anchorRect = new Rect(location[0], location[1], location[0] + mAnchor.getWidth(), location[1] + mAnchor.getHeight());
 
-                mWindow.setAnimationStyle(mAnimStyle);
-                setWindowLayoutType();
-                mWindow.showAtLocation(mAnchor, Gravity.NO_GRAVITY, anchorRect.left, anchorRect.bottom);
-            }
+            mWindow.setAnimationStyle(mAnimStyle);
+            setWindowLayoutType();
+            mWindow.showAtLocation(mAnchor, Gravity.NO_GRAVITY, anchorRect.left, anchorRect.bottom);
 
             mShowing = true;
 
@@ -378,10 +394,8 @@ public class MediaController extends FrameLayout {
         if (mShowing) {
             try {
                 mHandler.removeMessages(MSG_UPDATE_PROGRESS);
-                if (mFromXml)
-                    setVisibility(View.GONE);
-                else
-                    mWindow.dismiss();
+                mWindow.dismiss();
+
             } catch (IllegalArgumentException ex) {
                 Log.d("MediaController already removed");
             }
@@ -561,6 +575,13 @@ public class MediaController extends FrameLayout {
             mHandler.sendEmptyMessageDelayed(MSG_UPDATE_PROGRESS, 1000);
         }
     };
+
+
+    float mVideoVolume = 0.5f;
+
+    public void setVolume(float videoVolume) {
+        mVideoVolume = videoVolume;
+    }
 
     public interface OnShownListener {
         public void onShown();

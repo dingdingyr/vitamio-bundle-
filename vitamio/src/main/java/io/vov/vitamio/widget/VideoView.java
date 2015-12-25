@@ -39,7 +39,6 @@ import android.view.ViewGroup.LayoutParams;
 
 import java.io.IOException;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 import io.vov.vitamio.MediaFormat;
@@ -124,10 +123,11 @@ public class VideoView extends SurfaceView implements MediaController.MediaPlaye
                         start();
                         if (mMediaController != null)
                             mMediaController.show();
-                    } else if (!isPlaying() && (seekToPosition != 0 || getCurrentPosition() > 0)) {
-                        if (mMediaController != null)
-                            mMediaController.show(0);
                     }
+//                    else if (!isPlaying() && (seekToPosition != 0 || getCurrentPosition() > 0)) {
+//                        if (mMediaController != null)
+//                            mMediaController.show(0);
+//                    }
                 }
             } else if (mTargetState == STATE_PLAYING) {
                 start();
@@ -486,12 +486,6 @@ public class VideoView extends SurfaceView implements MediaController.MediaPlaye
             View anchorView = this.getParent() instanceof View ? (View) this.getParent() : this;
             mMediaController.setAnchorView(anchorView);
             mMediaController.setEnabled(isInPlaybackState());
-
-            if (mUri != null) {
-                List<String> paths = mUri.getPathSegments();
-                String name = paths == null || paths.isEmpty() ? "null" : paths.get(paths.size() - 1);
-                mMediaController.setFileName(name);
-            }
         }
     }
 
@@ -536,8 +530,11 @@ public class VideoView extends SurfaceView implements MediaController.MediaPlaye
 
     @Override
     public boolean onTouchEvent(MotionEvent ev) {
-        if (isInPlaybackState() && mMediaController != null)
-            toggleMediaControlsVisiblity();
+        if (isTouchable) {
+            if (isInPlaybackState() && mMediaController != null)
+                toggleMediaControlsVisiblity();
+        }
+
         return false;
     }
 
@@ -779,5 +776,14 @@ public class VideoView extends SurfaceView implements MediaController.MediaPlaye
 
     protected boolean isInPlaybackState() {
         return (mMediaPlayer != null && mCurrentState != STATE_ERROR && mCurrentState != STATE_IDLE && mCurrentState != STATE_PREPARING);
+    }
+
+    /**
+     * true，VideoView的Touch事件控制MediaController显示与隐藏
+     */
+    private boolean isTouchable = true;
+
+    public void setTouchable(boolean touchable) {
+        isTouchable = touchable;
     }
 }
